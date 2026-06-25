@@ -2,53 +2,37 @@
 
 Simple Python bot for automatically adding torrents from an RSS feed to Deluge WebUI.
 
-The bot reads RSS items, applies configurable filters, prevents duplicates using a local SQLite database, and sends matching torrent URLs to Deluge.
+The bot reads an RSS feed, filters torrent titles using configurable rules, prevents duplicates using SQLite, and sends matching torrents to Deluge through its WebUI API.
 
 > Use only with content you are legally allowed to download.
 
 ## Features
 
 * RSS torrent feed support
-* Deluge WebUI JSON API support
-* Duplicate protection using `seen.sqlite3`
-* Regex-based series matching
-* Per-series filters
+* Deluge WebUI integration
+* Duplicate protection (`seen.sqlite3`)
+* Per-series filtering
 * Optional default download location
-* Optional Deluge default download location
-* Dry-run mode for safe testing
-* Support for Nyaa RSS fields:
+* Per-series download locations
+* Regex-based title matching
+* Dry-run mode
+* Configurable release group filters
+* Nyaa RSS support
 
-  * `infoHash`
-  * `seeders`
-  * `trusted`
-  * `remake`
-  * `category`
-  * `size`
+---
 
 ## Requirements
 
 * Python 3.8+
 * Deluge with WebUI enabled
-* Python package:
+
+Install dependencies:
 
 ```bash
 pip install requests
 ```
 
-## Files
-
-Recommended project structure:
-
-```text
-torrent_bot/
-├── bot.py
-├── config.json
-├── config.example.json
-├── seen.sqlite3
-└── README.md
-```
-
-`seen.sqlite3` is created automatically after the first run.
+---
 
 ## Installation
 
@@ -65,259 +49,218 @@ Install dependencies:
 pip install requests
 ```
 
-Copy the example config:
+Copy the example configuration:
 
 ```bash
 cp config.example.json config.json
 ```
 
-Edit the config:
+Edit it:
 
 ```bash
 nano config.json
 ```
 
-## Example config
+---
+
+## Configuration
+
+A complete example configuration is available here:
+
+- [config.example.json](https://github.com/Wardf1/NyaaRSS-Deluge-Torrent-bot/blob/main/bot/config.example.json)
+  
+Replace the following values:
+
+* `deluge_url`
+* `deluge_password`
+
+and adjust the series list to your needs.
+
+---
+
+## Download Locations
+
+The bot supports three download modes.
+
+### 1. Series-specific folder
+
+If a series contains:
 
 ```json
-{
-  "rss_url": "https://nyaa.si/?page=rss",
-  "deluge_url": "http://127.0.0.1:8112",
-  "deluge_password": "CHANGE_ME",
-
-  "dry_run": true,
-
-  "default_download_location": "/mnt/hdd16tb/samba/download/",
-  "only_configured_series": true,
-
-  "torrent_options": {
-    "add_paused": false
-  },
-
-  "trusted_only": false,
-  "skip_remakes": false,
-  "min_seeders": 0,
-
-  "include_regex": [],
-  "exclude_regex": [
-    "480p",
-    "720p"
-  ],
-
-  "series": {
-    "Dr\\.? ?Stone|Science Future": {
-      "include_regex": [
-        "^\\[Judas\\].*1080p.*HEVC"
-      ],
-      "trusted_only": false,
-      "skip_remakes": false,
-      "min_seeders": 0
-    },
-
-    "Himekishi wa Barbaroi no Yome|The Warrior Princess and the Barbaric King": {
-      "include_regex": [
-        "^\\[Judas\\].*1080p.*HEVC"
-      ],
-      "trusted_only": false,
-      "skip_remakes": false,
-      "min_seeders": 0
-    }
-  }
-}
+"download_location": "/downloads/Anime/Dr Stone"
 ```
 
-## Configuration explained
+that folder will always be used.
 
-### `rss_url`
+---
 
-RSS feed URL.
+### 2. Global default folder
+
+If the series does **not** specify a download location, the bot falls back to:
 
 ```json
-"rss_url": "https://nyaa.si/?page=rss"
+"default_download_location": "/downloads/Anime"
 ```
 
-### `deluge_url`
+---
 
-Deluge WebUI address.
+### 3. Deluge default folder
+
+If `default_download_location` is omitted entirely, the bot does **not** send a download path.
+
+Deluge will then use its own configured default download directory.
+
+---
+
+## Regular Expressions (Regex)
+
+Series names are matched using Python regular expressions.
+
+Example:
 
 ```json
-"deluge_url": "http://127.0.0.1:8112"
+"Dr\\.? ?Stone|Science Future"
 ```
 
-### `deluge_password`
+matches all of the following:
 
-Password for Deluge WebUI.
-
-```json
-"deluge_password": "CHANGE_ME"
+```
+Dr Stone
+Dr.Stone
+Dr. Stone
+Science Future
 ```
 
-### `dry_run`
-
-If enabled, the bot only prints what it would add.
+Another example:
 
 ```json
-"dry_run": true
+"One Piece"
 ```
 
-Set to `false` when you are ready to actually add torrents.
+matches any title containing:
 
-### `default_download_location`
-
-Fallback download path used when a matched series does not define its own `download_location`.
-
-```json
-"default_download_location": "/mnt/hdd16tb/samba/download/"
+```
+One Piece
 ```
 
-If you remove this option, the bot will not send `download_location` to Deluge. Deluge will then use its own default download directory.
+---
 
-### `only_configured_series`
+### Release Groups
 
-If enabled, the bot only downloads torrents matching one of the configured series.
+You can restrict downloads to specific release groups.
 
-```json
-"only_configured_series": true
-```
-
-This is recommended.
-
-### `torrent_options`
-
-Options passed directly to Deluge.
+Example:
 
 ```json
-"torrent_options": {
-  "add_paused": false
-}
-```
-
-### Global filters
-
-```json
-"trusted_only": false,
-"skip_remakes": false,
-"min_seeders": 0
-```
-
-These apply to all torrents before series-specific filters.
-
-### Global include/exclude regex
-
-```json
-"include_regex": [],
-"exclude_regex": [
-  "480p",
-  "720p"
+"include_regex": [
+    "^\\[SubsPlease\\].*1080p"
 ]
 ```
 
-If `include_regex` is empty, no global include filter is applied.
+Matches:
 
-### Series rules
-
-Each key inside `series` is a regex matched against the torrent title.
-
-```json
-"Dr\\.? ?Stone|Science Future": {
-  "include_regex": [
-    "^\\[Judas\\].*1080p.*HEVC"
-  ]
-}
+```
+[SubsPlease] One Piece - 1135 (1080p)
 ```
 
-This matches titles containing:
+but ignores:
 
-* `Dr Stone`
-* `Dr.Stone`
-* `Science Future`
-
-and only accepts Judas 1080p HEVC releases.
-
-## Per-series download path
-
-By default, a series uses `default_download_location`.
-
-To use a separate folder for a series:
-
-```json
-"Dr\\.? ?Stone|Science Future": {
-  "download_location": "/mnt/hdd16tb/samba/download/Dr Stone",
-  "include_regex": [
-    "^\\[Judas\\].*1080p.*HEVC"
-  ]
-}
+```
+[Erai-raws] One Piece...
+[Judas] One Piece...
 ```
 
-If `download_location` is omitted, the bot falls back to `default_download_location`.
+---
 
-If both `download_location` and `default_download_location` are missing, Deluge uses its own configured default folder.
+### Multiple Release Groups
 
-## Duplicate protection
+```json
+"include_regex": [
+    "^\\[SubsPlease\\].*1080p",
+    "^\\[Judas\\].*1080p",
+    "^\\[Erai-raws\\].*1080p"
+]
+```
 
-The bot stores added torrents in:
+A torrent matching **any** of these expressions is accepted.
 
-```text
+---
+
+### Excluding Releases
+
+Example:
+
+```json
+"exclude_regex": [
+    "480p",
+    "720p",
+    "Batch"
+]
+```
+
+This rejects releases containing:
+
+* 480p
+* 720p
+* Batch
+
+---
+
+## Duplicate Protection
+
+The bot stores every successfully added torrent inside:
+
+```
 seen.sqlite3
 ```
 
-It uses the torrent `infoHash` as the main ID.
+using the torrent's **infoHash**.
 
-This means the bot will not add the same torrent again even if:
+This means it **will not** download the same torrent twice, even if:
 
-* the downloaded files are moved,
-* the torrent is removed from Deluge,
-* the bot is restarted.
+* the files were moved,
+* the torrent was removed from Deluge,
+* the bot was restarted.
 
-The bot may add a torrent again only if:
+A torrent will only be added again if:
 
 * `seen.sqlite3` is deleted,
-* the database entry is manually removed,
-* the uploader releases a new torrent with a different info hash.
+* the database entry is removed,
+* the uploader publishes a new torrent with a different infoHash.
+
+---
 
 ## Running
 
-Test first:
+Test mode:
 
 ```bash
 python3 bot.py
 ```
 
-When everything looks correct, edit `config.json`:
+When everything looks correct:
 
 ```json
 "dry_run": false
 ```
 
-Then run again:
+Run again:
 
 ```bash
 python3 bot.py
 ```
 
-## Cron example
+---
+
+## Cron
 
 Run every 10 minutes:
 
-```bash
-crontab -e
-```
-
-Add:
-
 ```cron
-*/10 * * * * cd /mnt/sda/bots/torrent_bot && /usr/bin/python3 bot.py >> bot.log 2>&1
+*/10 * * * * cd /path/to/rss-deluge-bot && /usr/bin/python3 bot.py >> bot.log 2>&1
 ```
 
-## Example log
-
-```text
-INFO: Fetching RSS...
-INFO: Found 75 RSS item(s).
-INFO: Matched: [Judas] Dr Stone - Science Future - S04E37 [1080p][HEVC x265 10bit]
-INFO: Path: /mnt/hdd16tb/samba/download/
-INFO: Added to Deluge.
-```
+---
 
 ## License
 
