@@ -1,0 +1,44 @@
+{
+  "rss_url": "https://nyaa.si/?page=rss",
+  "deluge_url": "http://127.0.0.1:8112",
+  "deluge_password": "CHANGE_ME",
+
+  "dry_run": true,
+
+  "default_download_location": "/mnt/hdd16tb/samba/download/",
+  "only_configured_series": true,
+
+  "torrent_options": {
+    "add_paused": false
+  },
+
+  "trusted_only": false,
+  "skip_remakes": false,
+  "min_seeders": 0,
+
+  "include_regex": [],
+  "exclude_regex": [
+    "480p",
+    "720p"
+  ],
+
+  "series": {
+    "Dr\\.? ?Stone|Science Future": {
+      "include_regex": [
+        "^\\[Judas\\].*1080p.*HEVC"
+      ],
+      "trusted_only": false,
+      "skip_remakes": false,
+      "min_seeders": 0
+    },
+
+    "Himekishi wa Barbaroi no Yome|The Warrior Princess and the Barbaric King": {
+      "include_regex": [
+        "^\\[Judas\\].*1080p.*HEVC"
+      ],
+      "trusted_only": false,
+      "skip_remakes": false,
+      "min_seeders": 0
+    }
+  }
+}
