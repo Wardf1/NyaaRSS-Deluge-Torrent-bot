@@ -6,6 +6,7 @@
   "dry_run": true,
 
   "default_download_location": "/mnt/hdd16tb/samba/download/",
+
   "only_configured_series": true,
 
   "torrent_options": {
@@ -14,7 +15,7 @@
 
   "trusted_only": false,
   "skip_remakes": false,
-  "min_seeders": 0,
+  "min_seeders": 5,
 
   "include_regex": [],
   "exclude_regex": [
@@ -25,20 +26,38 @@
   "series": {
     "Dr\\.? ?Stone|Science Future": {
       "include_regex": [
-        "^\\[Judas\\].*1080p.*HEVC"
-      ],
-      "trusted_only": false,
-      "skip_remakes": false,
-      "min_seeders": 0
+        "^\\[Judas\\].*1080p.*HEVC",
+        "^\\[SubsPlease\\].*1080p",
+        "^\\[Erai-raws\\].*1080p"
+      ]
+    },
+
+    "One Piece": {
+      "download_location": "/mnt/hdd16tb/samba/download/One Piece",
+
+      "include_regex": [
+        "^\\[SubsPlease\\].*1080p"
+      ]
     },
 
     "Himekishi wa Barbaroi no Yome|The Warrior Princess and the Barbaric King": {
+      "download_location": "/mnt/hdd16tb/samba/download/Himekishi",
+
       "include_regex": [
         "^\\[Judas\\].*1080p.*HEVC"
       ],
+
+      "exclude_regex": [
+        "Dual-Audio"
+      ],
+
       "trusted_only": false,
       "skip_remakes": false,
-      "min_seeders": 0
+      "min_seeders": 10,
+
+      "add_paused": true,
+
+      "move_completed_path": "/mnt/hdd16tb/media/Anime/Himekishi"
     }
   }
 }
