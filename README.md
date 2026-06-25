@@ -6,7 +6,7 @@ The bot reads an RSS feed, filters torrent titles using configurable rules, prev
 
 > Use only with content you are legally allowed to download.
 
-## Features
+## I. Features
 
 * RSS torrent feed support
 * Deluge WebUI integration
@@ -21,7 +21,7 @@ The bot reads an RSS feed, filters torrent titles using configurable rules, prev
 
 ---
 
-## Requirements
+## II. Requirements
 
 * Python 3.8+
 * Deluge with WebUI enabled
@@ -34,7 +34,7 @@ pip install requests
 
 ---
 
-## Installation
+## III. Installation
 
 Clone the repository:
 
@@ -63,7 +63,7 @@ nano config.json
 
 ---
 
-## Configuration
+## IV. Configuration
 
 A complete example configuration is available here:
 
@@ -78,7 +78,7 @@ and adjust the series list to your needs.
 
 ---
 
-## Download Locations
+## V. Download Locations
 
 The bot supports three download modes.
 
@@ -112,13 +112,13 @@ Deluge will then use its own configured default download directory.
 
 ---
 
-## Regular Expressions (Regex)
+## VI. Regular Expressions (Regex)
 
 Here is a full Regex list: [Regex List](https://github.com/Wardf1/NyaaRSS-Deluge-Torrent-bot/blob/main/REGEX.md)
 
 You can test your Regex here(Change Flavor to Python): [Regex Tester](https://regex101.com/)
 
-### Series Releases Regex
+### 1. Series Releases Regex
 
 Series names are matched using Python regular expressions.
 
@@ -152,7 +152,7 @@ One Piece
 
 ---
 
-### Release Groups Regex
+### 2. Release Groups Regex
 
 You can restrict downloads to specific release groups.
 
@@ -179,7 +179,7 @@ but ignores:
 
 ---
 
-### Multiple Release Groups
+### 3. Multiple Release Groups
 
 ```json
 "include_regex": [
@@ -193,7 +193,7 @@ A torrent matching **any** of these expressions is accepted.
 
 ---
 
-### Excluding Releases
+### 4. Excluding Releases
 
 Example:
 
@@ -213,7 +213,7 @@ This rejects releases containing:
 
 ---
 
-## Duplicate Protection
+## VII. Duplicate Protection
 
 The bot stores every successfully added torrent inside:
 
@@ -237,7 +237,7 @@ A torrent will only be added again if:
 
 ---
 
-## Running
+## VIII. Running
 
 Test mode:
 
@@ -259,7 +259,7 @@ python3 bot.py
 
 ---
 
-## Cron
+## IX. Cron
 
 Run every 10 minutes:
 
@@ -269,6 +269,6 @@ Run every 10 minutes:
 
 ---
 
-## License
+## X. License
 
 MIT License.
