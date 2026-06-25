@@ -143,7 +143,8 @@ matches any title containing:
 One Piece
 ```
 
-Here is a full Regex list: [Regex List](https://github.com/Wardf1/NyaaRSS-Deluge-Torrent-bot/blob/main/REGEX.md)..
+Here is a full Regex list: [Regex List](https://github.com/Wardf1/NyaaRSS-Deluge-Torrent-bot/blob/main/REGEX.md)
+
 You can test your Regex here(Change Flavor to Python): [Regex Tester](https://regex101.com/)
 
 ---
