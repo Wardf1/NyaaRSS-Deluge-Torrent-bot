@@ -5,7 +5,7 @@
 
   "dry_run": true,
 
-  "default_download_location": "/mnt/hdd16tb/samba/download/",
+  "default_download_location": "<Default Download Location>",
 
   "only_configured_series": true,
 
@@ -41,7 +41,7 @@
     },
 
     "Himekishi wa Barbaroi no Yome|The Warrior Princess and the Barbaric King": {
-      "download_location": "/mnt/hdd16tb/samba/download/Himekishi",
+      "download_location": "<Custom Download Location>",
 
       "include_regex": [
         "^\\[Judas\\].*1080p.*HEVC"
@@ -57,7 +57,7 @@
 
       "add_paused": true,
 
-      "move_completed_path": "/mnt/hdd16tb/media/Anime/Himekishi"
+      "move_completed_path": "<Move To New Location After Download>"
     }
   }
 }
