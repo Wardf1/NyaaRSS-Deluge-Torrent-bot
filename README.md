@@ -8,7 +8,7 @@ Choose your language:
 
 | Flag | Language                | File                                                   |
 | :--: | ----------------------- | ------------------------------------------------------ |
-| 🇺🇸 | English (United States) | [README-(EN-US).md](README-Lang/README-%28EN-Us%29.md) |
+| 🇺🇸 | English (United States) | [README-(EN-US).md](README-Lang/README-%28En-Us%29.md) |
 | 🇵🇱 | Polski                  | [README-(PL-PL).md](README-Lang/README-%28PL-pl%29.md) |
 
 More languages may be added in future releases.
