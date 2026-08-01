@@ -1,0 +1,34 @@
+[Unit]
+Description=Nyaa RSS Deluge Torrent Bot
+Documentation=https://github.com/OWNER/REPOSITORY
+Wants=network-online.target
+After=network-online.target deluged.service deluge-web.service
+
+[Service]
+Type=oneshot
+
+User=<USER>
+Group=<GROUP>
+
+WorkingDirectory=/opt/nyaa-rss-deluge-bot
+ExecStart=/usr/bin/python3 /opt/nyaa-rss-deluge-bot/bot.py
+
+Environment=PYTHONUNBUFFERED=1
+
+Nice=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+ReadWritePaths=/opt/nyaa-rss-deluge-bot
+ReadWritePaths=/downloads
+
+StandardOutput=journal
+StandardError=journal
+
+TimeoutStartSec=5min
+
+[Install]
+WantedBy=multi-user.target
