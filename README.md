@@ -1,10 +1,10 @@
 # RSS Deluge Bot
 
-Simple Python bot for automatically adding torrents from an RSS feed to Deluge WebUI.
+A Python bot for automatically monitoring an RSS feed and adding matching torrents to Deluge WebUI.
 
-The bot monitors an RSS feed, filters releases using configurable rules, prevents duplicate downloads using SQLite, and automatically adds matching torrents to Deluge through its WebUI API.
+The bot supports configurable filters, per-series rules, duplicate protection using SQLite, automatic file renaming, Discord notifications, and optional HEVC transcoding through a separate worker.
 
-> Use only with content you are legally allowed to download.
+> Use only with content you are legally allowed to download and process.
 
 ---
 
@@ -24,14 +24,18 @@ Additional translations may be added in future releases.
 ## ✨ Features
 
 * RSS torrent feed support
+* Nyaa RSS support
 * Deluge WebUI integration
 * Duplicate protection using SQLite
 * Per-series filtering
-* Configurable download locations
 * Regex-based title matching
-* Release group filtering
+* Configurable download locations
+* Automatic file renaming
+* Discord notifications
+* Optional FFmpeg/FFprobe HEVC transcoding
+* Shared configuration for the bot and transcode worker
+* Example `systemd` services and timer
 * Dry-run mode
-* Nyaa RSS support
 
 ---
 
@@ -47,7 +51,7 @@ cd NyaaRSS-Deluge-Torrent-bot
 Install dependencies:
 
 ```bash
-pip install requests
+python3 -m pip install requests
 ```
 
 Copy the example configuration:
@@ -56,19 +60,45 @@ Copy the example configuration:
 cp bot/config.example.json bot/config.json
 ```
 
-Edit your configuration:
+Edit the configuration:
 
 ```bash
 nano bot/config.json
 ```
 
-Run the bot:
+Run the RSS bot:
 
 ```bash
+cd bot
 python3 bot.py
 ```
 
-For complete installation, configuration, and usage instructions, see one of the language-specific documentation files above.
+Run the transcode worker:
+
+```bash
+python3 transcode_worker.py
+```
+
+For complete installation, configuration, Deluge setup, transcoding, Discord webhook, database, and `systemd` instructions, use one of the language-specific documentation files above.
+
+---
+
+## 📁 Main Files
+
+```text
+bot/
+├── bot.py
+├── transcode_worker.py
+├── regex_gen.py
+└── config.example.json
+
+systemd/
+├── nyaa-rss-deluge-bot.service
+├── nyaa-rss-deluge-bot.timer
+└── nyaa-transcode-worker.service
+```
+
+Do not publish your real `config.json`, database, webhook URLs, or passwords.
 
 ---
 
