@@ -1,0 +1,43 @@
+[Unit]
+Description=Nyaa HEVC Transcode Worker
+Documentation=https://github.com/OWNER/REPOSITORY
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+
+User=wardf
+Group=wardf
+
+WorkingDirectory=/opt/nyaa-rss-deluge-bot
+ExecStart=/usr/bin/python3 /opt/nyaa-rss-deluge-bot/transcode_worker.py --daemon --interval 30
+
+Environment=PYTHONUNBUFFERED=1
+
+Restart=on-failure
+RestartSec=15s
+
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+ReadWritePaths=/opt/nyaa-rss-deluge-bot
+ReadWritePaths=/downloads
+
+DeviceAllow=/dev/dri/renderD128 rw
+SupplementaryGroups=render video
+
+StandardOutput=journal
+StandardError=journal
+
+TimeoutStopSec=60s
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
