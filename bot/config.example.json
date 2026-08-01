@@ -88,7 +88,7 @@
       "default_season": 1,
 
       "set_name": "[ASW] Example ASW Series - {se}",
-
+      "move_completed_path": "/downloads/Example ASW Series",
       "transcode": false
     },
 
