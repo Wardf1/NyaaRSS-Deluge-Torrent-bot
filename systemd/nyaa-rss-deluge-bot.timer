@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Nyaa RSS Deluge Bot every 2 minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=2min
+
+AccuracySec=10s
+Persistent=true
+
+Unit=nyaa-rss-deluge-bot.service
+
+[Install]
+WantedBy=timers.target
