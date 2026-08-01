@@ -8,19 +8,6 @@ The bot supports configurable filters, per-series rules, duplicate protection us
 
 ---
 
-## 📖 Documentation
-
-Choose your preferred language:
-
-| Language          | Documentation                                            |
-| ----------------- | -------------------------------------------------------- |
-| 🇺🇸 English (US) | [README (En-us).md](README-Lang/README%20%28En-us%29.md) |
-| 🇵🇱 Polski       | [README-(PL-pl).md](README-Lang/README-%28PL-pl%29.md)   |
-
-Additional translations may be added in future releases.
-
----
-
 ## ✨ Features
 
 * RSS torrent feed support
