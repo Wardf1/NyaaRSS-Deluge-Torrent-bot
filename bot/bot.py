@@ -1268,11 +1268,54 @@ def main():
                 if deluge is None:
                     raise RuntimeError("Deluge client is not initialized")
 
-                deluge.add_torrent_url(
+                added_torrent_id = deluge.add_torrent_url(
                     torrent["torrent_url"],
                     options
                 )
-                logging.info("Added to Deluge.")
+
+                logging.info(
+                    "Added to Deluge: %s",
+                    added_torrent_id
+                )
+
+            except requests.exceptions.HTTPError as error:
+                status_code = (
+                    error.response.status_code
+                    if error.response is not None
+                    else None
+                )
+
+                if status_code == 404:
+                    logging.warning(
+                        "Torrent file returned HTTP 404 and will be skipped: %s",
+                        torrent["torrent_url"]
+                    )
+
+                    # Zapisz jako obsłużony, aby martwy link nie blokował
+                    # każdego kolejnego uruchomienia.
+                    mark_seen(
+                        con,
+                        torrent_id,
+                        torrent["title"],
+                        torrent["torrent_url"]
+                    )
+
+                    continue
+
+                logging.warning(
+                    "Could not download torrent file; item will be retried later: %s: %s",
+                    torrent["title"],
+                    error
+                )
+                continue
+
+            except requests.exceptions.RequestException as error:
+                logging.warning(
+                    "Torrent download request failed; item will be retried later: %s: %s",
+                    torrent["title"],
+                    error
+                )
+                continue
 
             except RuntimeError as error:
                 message = str(error)
@@ -1281,8 +1324,15 @@ def main():
                     logging.warning(
                         "Torrent already in Deluge, marking as seen."
                     )
+
+                    added_torrent_id = torrent_id
                 else:
-                    raise
+                    logging.warning(
+                        "Deluge rejected torrent; item will be retried later: %s: %s",
+                        torrent["title"],
+                        error
+                    )
+                    continue
 
             mark_seen(
                 con,
