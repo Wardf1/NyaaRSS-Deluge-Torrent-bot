@@ -6,6 +6,7 @@ import fcntl
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +71,20 @@ def update_queue(cfg: Dict[str, Any], callback):
         finally:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
+
+def codec_filename_label(codec_name: str) -> str:
+    normalized = codec_name.strip().lower()
+
+    labels = {
+        "hevc": "HEVC",
+        "h265": "HEVC",
+        "h264": "H.264",
+        "av1": "AV1",
+        "vp9": "VP9",
+        "mpeg4": "MPEG-4",
+    }
+
+    return labels.get(normalized, normalized.upper())
 
 def claim_next_job(cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     stale_after = int(get_transcode_cfg(cfg).get("processing_stale_after", 21600))
@@ -339,6 +354,7 @@ def send_transcode_webhook(
         logging.warning("Transcode webhook failed: %s", error)
 
 
+# Wardf
 def build_ffmpeg_command(
     cfg: Dict[str, Any],
     job: Dict[str, Any],
@@ -349,43 +365,168 @@ def build_ffmpeg_command(
     transcode_video: bool,
 ) -> List[str]:
     transcode_cfg = get_transcode_cfg(cfg)
+
+    encoder = str(transcode_cfg.get("encoder", "libx265"))
+    hardware_acceleration = str(
+        transcode_cfg.get("hardware_acceleration", "none")
+    ).lower()
+
     command = [
         ffmpeg,
         "-hide_banner",
         "-nostdin",
         "-y",
-        "-i", str(source),
-        "-map", "0",
-        "-map_metadata", "0",
-        "-map_chapters", "0",
-        "-c", "copy",
     ]
 
-    if transcode_video:
-        encoder = str(transcode_cfg.get("encoder", "libx265"))
-        command.extend(["-c:v:0", encoder])
+    # VAAPI musi zostać zainicjalizowane przed wejściem.
+    if transcode_video and hardware_acceleration == "vaapi":
+        vaapi_device = str(
+            transcode_cfg.get(
+                "vaapi_device",
+                "/dev/dri/renderD128"
+            )
+        )
 
-        if encoder == "libx265":
+        command.extend([
+            "-init_hw_device",
+            f"vaapi=va:{vaapi_device}",
+            "-filter_hw_device",
+            "va",
+        ])
+
+    command.extend([
+        "-i",
+        str(source),
+        "-map",
+        "0",
+        "-map_metadata",
+        "0",
+        "-map_chapters",
+        "0",
+
+        # Domyślnie zachowaj wszystkie strumienie.
+        "-c",
+        "copy",
+    ])
+
+    if transcode_video:
+        if hardware_acceleration == "vaapi" or encoder == "hevc_vaapi":
+            video_filter = str(
+                transcode_cfg.get(
+                    "video_filter",
+                    "format=nv12,hwupload"
+                )
+            )
+
             command.extend([
-                "-preset", str(transcode_cfg.get("preset", "medium")),
-                "-crf", str(transcode_cfg.get("crf", 22)),
+                "-vf",
+                video_filter,
+                "-c:v:0",
+                "hevc_vaapi",
             ])
+
+            rate_control = str(
+                transcode_cfg.get(
+                    "rate_control",
+                    "constant_qp"
+                )
+            ).lower()
+
+            if rate_control == "constant_qp":
+                command.extend([
+                    "-qp",
+                    str(transcode_cfg.get("qp", 24)),
+                ])
+            elif rate_control == "constant_quality":
+                command.extend([
+                    "-global_quality",
+                    str(transcode_cfg.get("global_quality", 24)),
+                ])
+            elif rate_control == "bitrate":
+                command.extend([
+                    "-b:v",
+                    str(transcode_cfg.get("video_bitrate", "2500k")),
+                ])
+
+            profile = transcode_cfg.get("profile")
+            if profile:
+                command.extend([
+                    "-profile:v",
+                    str(profile),
+                ])
+
+            level = transcode_cfg.get("level")
+            if level:
+                command.extend([
+                    "-level:v",
+                    str(level),
+                ])
+
+        elif encoder == "libx265":
+            command.extend([
+                "-c:v:0",
+                "libx265",
+                "-preset",
+                str(transcode_cfg.get("preset", "medium")),
+                "-crf",
+                str(transcode_cfg.get("crf", 22)),
+            ])
+
+            pixel_format = transcode_cfg.get(
+                "pixel_format",
+                "yuv420p10le"
+            )
+
+            if pixel_format:
+                command.extend([
+                    "-pix_fmt",
+                    str(pixel_format),
+                ])
+
         elif "nvenc" in encoder:
             command.extend([
-                "-preset", str(transcode_cfg.get("preset", "p5")),
-                "-cq", str(transcode_cfg.get("cq", 24)),
+                "-c:v:0",
+                encoder,
+                "-preset",
+                str(transcode_cfg.get("preset", "p5")),
+                "-cq",
+                str(transcode_cfg.get("cq", 24)),
             ])
+
         elif "qsv" in encoder:
             command.extend([
-                "-global_quality", str(transcode_cfg.get("global_quality", 24)),
+                "-c:v:0",
+                encoder,
+                "-global_quality",
+                str(transcode_cfg.get("global_quality", 24)),
             ])
 
-        pixel_format = transcode_cfg.get("pixel_format", "yuv420p10le")
-        if pixel_format:
-            command.extend(["-pix_fmt", str(pixel_format)])
+        else:
+            command.extend([
+                "-c:v:0",
+                encoder,
+            ])
 
-    command.extend(metadata_arguments(cfg, job, input_probe))
-    command.extend(["-max_muxing_queue_size", "4096", str(output)])
+    # Jawne kopiowanie pozostałych ścieżek.
+    command.extend([
+        "-c:a",
+        str(transcode_cfg.get("audio_codec", "copy")),
+        "-c:s",
+        str(transcode_cfg.get("subtitle_codec", "copy")),
+        "-c:t",
+        str(transcode_cfg.get("attachment_codec", "copy")),
+    ])
+
+    command.extend(
+        metadata_arguments(cfg, job, input_probe)
+    )
+
+    command.extend([
+        "-max_muxing_queue_size",
+        "4096",
+        str(output),
+    ])
+
     return command
 
 
@@ -485,17 +626,39 @@ def process_job(cfg: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
     subtitle_count = len(streams_of_type(input_probe, "subtitle"))
 
     if not transcode_video and not metadata_remux:
+        codec_label = codec_filename_label(old_codec)
+    
+        codec_pattern = re.compile(
+            r"\s+\[(?:HEVC|H\.265|H\.264|AV1|VP9|MPEG-4|X264|X265)\]$",
+            re.IGNORECASE,
+        )
+    
+        clean_stem = codec_pattern.sub("", source.stem)
+        renamed_source = source.with_name(
+            f"{clean_stem} [{codec_label}]{source.suffix}"
+        )
+    
+        if renamed_source != source:
+            if renamed_source.exists():
+                raise RuntimeError(
+                    f"Codec-labelled file already exists: {renamed_source}"
+                )
+    
+            source.rename(renamed_source)
+            source = renamed_source
+    
         send_transcode_webhook(
             cfg,
             "✅ Codec check completed",
             source.name,
             [
-                {"name": "Codec", "value": old_codec.upper(), "inline": True},
+                {"name": "Codec", "value": codec_label, "inline": True},
                 {"name": "Action", "value": "No conversion required", "inline": True},
                 {"name": "Size", "value": human_size(input_size), "inline": True},
             ],
             3066993,
         )
+    
         return {
             "action": "skipped",
             "codec": old_codec,
@@ -553,13 +716,42 @@ def process_job(cfg: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
         ),
     )
 
+
     output_size = output.stat().st_size
-    keep_source = not bool(transcode_cfg.get("delete_source_after_success", True))
-    safe_replace(
-        source, output, final_path=final_path, keep_source=keep_source
+    
+    # Pobierz faktyczny kodek z gotowego pliku tymczasowego.
+    new_codec = primary_video_codec(output_probe)
+    
+    if not new_codec:
+        raise RuntimeError("Could not detect output video codec")
+    
+    codec_label = codec_filename_label(new_codec)
+    
+    # Usuń poprzedni znacznik kodeka z końca nazwy, jeżeli istnieje.
+    codec_pattern = re.compile(
+        r"\s+\[(?:HEVC|H\.265|H\.264|AV1|VP9|MPEG-4|X264|X265)\]$",
+        re.IGNORECASE,
     )
+    
+    clean_stem = codec_pattern.sub("", final_path.stem)
+    
+    # Końcowa nazwa zawsze zawiera faktyczny kodek.
+    final_path = final_path.with_name(
+        f"{clean_stem} [{codec_label}]{final_path.suffix}"
+    )
+    
+    keep_source = not bool(
+        transcode_cfg.get("delete_source_after_success", True)
+    )
+    
+    safe_replace(
+        source,
+        output,
+        final_path=final_path,
+        keep_source=keep_source,
+    )
+    
     elapsed = int(time.monotonic() - started)
-    new_codec = primary_video_codec(probe_media(ffprobe, final_path))
 
     send_transcode_webhook(
         cfg,
