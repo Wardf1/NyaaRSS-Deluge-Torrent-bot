@@ -9,6 +9,10 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from utf8_io import configure_utf8_output
+
+configure_utf8_output()
+
 
 EPISODE_PATTERNS = [
     # S02E03

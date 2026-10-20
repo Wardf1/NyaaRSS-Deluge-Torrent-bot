@@ -14,6 +14,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from utf8_io import configure_utf8_output
+
+configure_utf8_output()
+
 import requests
 
 CONFIG_FILE = "config.json"
@@ -26,7 +30,7 @@ logging.basicConfig(
 
 
 def load_config() -> Dict[str, Any]:
-    with open(CONFIG_FILE, "r", encoding="utf-8") as handle:
+    with open(CONFIG_FILE, "r", encoding="utf-8-sig") as handle:
         return json.load(handle)
 
 
@@ -150,6 +154,8 @@ def run_command(command: List[str], timeout: Optional[int] = None) -> subprocess
         command,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=timeout,
         check=False,
     )
@@ -342,7 +348,7 @@ def send_transcode_webhook(
             "description": description[:4096],
             "color": color,
             "fields": fields[:25],
-            "footer": {"text": "Wardf • Nyaa Transcode Worker"},
+            "footer": {"text": "Nyaa Transcode Worker"},
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }],
     }
@@ -810,7 +816,7 @@ def run_one(cfg: Dict[str, Any]) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Wardf Nyaa transcode worker")
+    parser = argparse.ArgumentParser(description="Nyaa transcode worker")
     parser.add_argument("--daemon", action="store_true", help="Run continuously")
     parser.add_argument("--interval", type=int, default=30, help="Daemon polling interval")
     parser.add_argument("--all", action="store_true", help="Process all queued jobs then exit")

@@ -14,7 +14,12 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, Optional
 
+from utf8_io import configure_utf8_output
+
+configure_utf8_output()
+
 import requests
+import torrent_recovery as recovery
 
 
 CONFIG_FILE = "config.json"
@@ -32,7 +37,7 @@ logging.basicConfig(
 
 
 def load_config() -> Dict[str, Any]:
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    with open(CONFIG_FILE, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
 
@@ -65,6 +70,7 @@ def init_db() -> sqlite3.Connection:
         )
 
     con.commit()
+    recovery.init_storage(con)
     return con
 
 
@@ -73,6 +79,7 @@ def get_pending_renames(con: sqlite3.Connection):
         SELECT id, title, rename_plan
         FROM seen
         WHERE renamed = 0
+        ORDER BY added_at DESC
     """).fetchall()
 
 
@@ -137,7 +144,7 @@ def fetch_rss(
     last_error: Optional[Exception] = None
 
     headers = {
-        "User-Agent": "Wardf-Nyaa-RSS-Deluge-Bot/1.0"
+        "User-Agent": "Nyaa-RSS-Deluge-Bot/1.0"
     }
 
     for attempt in range(1, attempts + 1):
@@ -155,7 +162,7 @@ def fetch_rss(
             )
             response.raise_for_status()
 
-            return response.text
+            return response.content.decode("utf-8-sig")
 
         except (
             requests.exceptions.ConnectTimeout,
@@ -368,18 +375,29 @@ class DelugeWeb:
             f"Deluge WebUI could not connect to any daemon host: {last_error}"
         )
 
-    def add_torrent_url(self, torrent_url: str, options: Dict[str, Any]):
+    def add_torrent_url(self, torrent_url: str, options: Dict[str, Any], prepare=None):
         r = self.session.get(torrent_url, timeout=30)
         r.raise_for_status()
 
+        metadata = recovery.decode_torrent(r.content)
+        if prepare is not None:
+            # Commit metadata before Deluge can finish and auto-remove a torrent.
+            prepare(metadata)
         torrent_name = torrent_url.rstrip("/").split("/")[-1]
         torrent_data = base64.b64encode(r.content).decode("utf-8")
-
-        return self.call("core.add_torrent_file", [
-            torrent_name,
-            torrent_data,
-            options
+        result = self.call("core.add_torrent_file", [
+            torrent_name, torrent_data, options
         ])
+        if not result:
+            existing = self.call("core.get_torrent_status", [
+                metadata["hash"], ["name"]
+            ])
+            if not existing or not existing.get("name"):
+                raise RuntimeError("Deluge did not confirm adding the torrent")
+            return metadata["hash"]
+        if str(result).lower() != metadata["hash"]:
+            raise RuntimeError("Deluge returned an unexpected torrent hash")
+        return result
 
     def get_torrent_status(self, torrent_id: str) -> Dict[str, Any]:
         self.ensure_daemon_connected()
@@ -436,64 +454,64 @@ def send_discord_webhook(torrent: Dict[str, Any], options: Dict[str, Any], cfg: 
         "username": webhook_cfg.get("username", "Nyaa RSS Bot"),
         "embeds": [
             {
-                "title": "📥 Torrent added to Deluge",
+                "title": "đź“Ą Torrent added to Deluge",
                 "description": torrent.get("title", "Unknown")[:4096],
                 "url": torrent.get("guid") or torrent.get("torrent_url"),
                 "color": 5814783,
                 "fields": [
                     {
-                        "name": "📄 File name",
+                        "name": "đź“„ File name",
                         "value": torrent.get("title", "Unknown")[:1024],
                         "inline": False
                     },
                     {
-                        "name": "💾 Size",
+                        "name": "đź’ľ Size",
                         "value": torrent.get("size", "Unknown"),
                         "inline": True
                     },
                     {
-                        "name": "🌱 Seeders",
+                        "name": "đźŚ± Seeders",
                         "value": str(torrent.get("seeders", 0)),
                         "inline": True
                     },
                     {
-                        "name": "👥 Leechers",
+                        "name": "đź‘Ą Leechers",
                         "value": str(torrent.get("leechers", 0)),
                         "inline": True
                     },
                     {
-                        "name": "📂 Download path",
+                        "name": "đź“‚ Download path",
                         "value": options.get("download_location", "Deluge default")[:1024],
                         "inline": False
                     },
                     {
-                        "name": "🏷️ Category",
+                        "name": "đźŹ·ď¸Ź Category",
                         "value": torrent.get("category", "Unknown"),
                         "inline": True
                     },
                     {
-                        "name": "✅ Trusted",
+                        "name": "âś… Trusted",
                         "value": "Yes" if torrent.get("trusted") else "No",
                         "inline": True
                     },
                     {
-                        "name": "♻️ Remake",
+                        "name": "â™»ď¸Ź Remake",
                         "value": "Yes" if torrent.get("remake") else "No",
                         "inline": True
                     },
                     {
-                        "name": "🔗 Torrent",
+                        "name": "đź”— Torrent",
                         "value": f"[Download .torrent]({torrent.get('torrent_url')})",
                         "inline": False
                     },
                     {
-                        "name": "🧬 Info Hash",
+                        "name": "đź§¬ Info Hash",
                         "value": f"`{torrent.get('info_hash', 'Unknown')}`",
                         "inline": False
                     }
                 ],
                 "footer": {
-                    "text": "Wardf • Nyaa RSS Deluge Bot"
+                    "text": "Nyaa RSS Deluge Bot"
                 },
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             }
@@ -526,7 +544,7 @@ def send_discord_log_webhook(cfg: Dict[str, Any], title: str, message: str, colo
                 "description": message[:4096],
                 "color": color,
                 "footer": {
-                    "text": "Wardf • Nyaa RSS Deluge Bot"
+                    "text": "Nyaa RSS Deluge Bot"
                 },
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             }
@@ -598,6 +616,8 @@ def collect_systemd_journal(
         command,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=30,
         check=False
     )
@@ -615,7 +635,7 @@ def limit_log_size(log_text: str, max_size_bytes: int) -> str:
     if len(encoded) <= max_size_bytes:
         return log_text
 
-    # Zachowaj końcową, najnowszą część logu.
+    # Zachowaj koĹ„cowÄ…, najnowszÄ… czÄ™Ĺ›Ä‡ logu.
     limited = encoded[-max_size_bytes:].decode(
         "utf-8",
         errors="replace"
@@ -657,8 +677,8 @@ def send_discord_journal_file(
             "Nyaa RSS Bot Logs"
         ),
         "content": (
-            f"📄 **Nyaa RSS bot journal**\n"
-            f"Period: `{since_text}` – `{until_text}`\n"
+            f"đź“„ **Nyaa RSS bot journal**\n"
+            f"Period: `{since_text}` â€“ `{until_text}`\n"
             f"Runs: `{run_count}`"
         )
     }
@@ -729,7 +749,7 @@ def process_journal_counter(cfg: Dict[str, Any]) -> None:
                 "Journal is empty; report will not be sent."
             )
 
-            # Okres uznajemy za obsłużony.
+            # Okres uznajemy za obsĹ‚uĹĽony.
             write_text_atomic(
                 JOURNAL_LAST_SEND_FILE,
                 str(until_timestamp)
@@ -794,7 +814,7 @@ def process_journal_counter(cfg: Dict[str, Any]) -> None:
             current_count
         )
 
-        # Reset dopiero po poprawnym wysłaniu.
+        # Reset dopiero po poprawnym wysĹ‚aniu.
         write_text_atomic(
             JOURNAL_LAST_SEND_FILE,
             str(until_timestamp)
@@ -976,8 +996,8 @@ def enqueue_transcode_job(
             try:
                 jobs = json.loads(queue_path.read_text(encoding="utf-8"))
                 if not isinstance(jobs, list):
-                    jobs = []
-            except (FileNotFoundError, json.JSONDecodeError, OSError):
+                    raise ValueError("Invalid transcode queue: expected a list")
+            except FileNotFoundError:
                 jobs = []
 
             normalized_path = str(file_path.resolve(strict=False))
@@ -985,10 +1005,18 @@ def enqueue_transcode_job(
             for job in jobs:
                 if (
                     str(job.get("file_path", "")) == normalized_path
+                    and job.get("torrent_id") == torrent_id
                     and job.get("status") in {"queued", "processing", "done"}
                 ):
                     logging.info("Transcode job already exists: %s", file_path)
                     return True
+
+            if any(
+                str(job.get("file_path", "")) == normalized_path
+                and job.get("status") in {"queued", "processing"}
+                for job in jobs
+            ):
+                raise RuntimeError(f"Another torrent is processing this path: {file_path}")
 
             jobs.append({
                 "job_id": f"{torrent_id}:{int(time.time())}:{file_path.name}",
@@ -1125,75 +1153,100 @@ def process_completed_renames(
     deluge: DelugeWeb,
     cfg: Dict[str, Any]
 ) -> None:
-    # Wardf
-    for torrent_id, original_rss_title, rename_plan_text in get_pending_renames(con):
-        rule = get_series_rule(original_rss_title, cfg)
+    deluge.ensure_daemon_connected()
+    statuses = deluge.call("core.get_torrents_status", [
+        {}, ["name", "files", "save_path", "progress", "state"]
+    ])
+    if not isinstance(statuses, dict):
+        raise RuntimeError("Cannot obtain an authoritative Deluge torrent list")
 
-        if not rule:
-            mark_renamed(con, torrent_id)
-            continue
-
+    budget = [max(0, int(cfg.get("recovery_metadata_per_run", 3)))]
+    waiting = 0
+    recovered = 0
+    for torrent_id, title, plan_text in get_pending_renames(con):
         try:
-            status = deluge.get_torrent_status(torrent_id)
-        except RuntimeError as error:
-            message = str(error)
-
-            if (
-                "InvalidTorrentError" in message
-                or "KeyError" in message
-                or "not found" in message.lower()
-            ):
-                logging.info(
-                    "Torrent is no longer present in Deluge: %s",
-                    torrent_id
-                )
-                execute_filesystem_rename_plan(
-                    con,
-                    torrent_id,
-                    original_rss_title,
-                    rename_plan_text,
-                    cfg
-                )
+            rule = get_series_rule(title, cfg)
+            if rule is None:
+                # A temporary configuration change must not discard pending work.
+                continue
+            status = statuses.get(torrent_id)
+            if status is not None:
+                plan = build_filesystem_rename_plan(title, status, rule)
+                if plan:
+                    save_rename_plan(con, torrent_id, plan)
+                metadata, locations = recovery.source_record(con, torrent_id)
+                if metadata and status.get("save_path"):
+                    recovery.store_source(
+                        con, torrent_id, metadata,
+                        [status["save_path"]] + locations
+                    )
+                # Preserve seeding: never modify files still managed by Deluge.
                 continue
 
-            logging.warning(
-                "Could not query torrent status; rename will be retried: %s: %s",
-                torrent_id,
-                error
+            url = con.execute(
+                "SELECT torrent_url FROM seen WHERE id=?", (torrent_id,)
+            ).fetchone()[0]
+            options = build_deluge_options({"title": title}, cfg)
+            metadata, locations = recovery.recover_source(
+                con, torrent_id, url, cfg, options, budget
             )
-            continue
+            if metadata is None:
+                waiting += 1
+                continue
 
-        if not status:
+            # Finish an interrupted handoff without submitting the same jobs again.
+            queue_path = get_transcode_queue_path(cfg)
+            if queue_path.exists():
+                lock_path = queue_path.with_suffix(queue_path.suffix + ".lock")
+                with lock_path.open("a+", encoding="utf-8") as lock_file:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
+                    try:
+                        jobs = json.loads(queue_path.read_text(encoding="utf-8"))
+                        if not isinstance(jobs, list):
+                            raise ValueError("Invalid transcode queue")
+                    finally:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                handled = {
+                    job.get("file_path") for job in jobs
+                    if job.get("torrent_id") == torrent_id
+                    and job.get("status") in {"queued", "processing", "done"}
+                }
+                if plan_text:
+                    expected = {op["target"] for op in json.loads(plan_text)}
+                    if expected and expected <= handled:
+                        mark_renamed(con, torrent_id)
+                        continue
+
+            plan = recovery.verified_plan(
+                metadata, locations, title, rule, plan_text, build_new_file_name
+            )
+            if plan is None:
+                waiting += 1
+                con.execute(
+                    "UPDATE torrent_sources SET last_error=? WHERE id=?",
+                    ("No complete file matching torrent piece hashes at saved paths", torrent_id)
+                )
+                con.commit()
+                continue
+            # Recheck presence after hashing, which may take time on large files.
+            current = deluge.call("core.get_torrents_status", [{}, ["name"]])
+            if not isinstance(current, dict):
+                raise RuntimeError("Cannot confirm torrent is still absent")
+            if torrent_id in current:
+                continue
+            save_rename_plan(con, torrent_id, plan)
             execute_filesystem_rename_plan(
-                con,
-                torrent_id,
-                original_rss_title,
-                rename_plan_text,
-                cfg
+                con, torrent_id, title, json.dumps(plan), cfg
             )
-            continue
-
-        # Deluge może raportować nazwę torrenta inną niż faktyczna nazwa pliku.
-        # Dlatego plan zawsze budujemy z aktualnego files[].path.
-        rename_plan = build_filesystem_rename_plan(
-            original_rss_title,
-            status,
-            rule
-        )
-
-        if rename_plan:
-            save_rename_plan(con, torrent_id, rename_plan)
-            logging.info(
-                "Saved current file path(s) for later rename: %s",
-                original_rss_title
-            )
-        else:
-            logging.warning(
-                "Deluge returned no supported file paths for: %s",
-                original_rss_title
-            )
-
-        # Dopóki torrent jest obecny w Deluge, plik nie jest zmieniany.
+            recovered += 1
+        except Exception:
+            # A corrupt file or temporary RPC/network error must not starve
+            # every torrent later in the database.
+            logging.exception("Pending torrent processing failed: %s", torrent_id)
+    logging.info(
+        "Recovery pass: handled=%s, awaiting metadata or complete files=%s",
+        recovered, waiting
+    )
 
 
 def main():
@@ -1204,7 +1257,7 @@ def main():
         dry_run = cfg.get("dry_run", False)
         deluge = None
 
-        # Najpierw Deluge i zaległe zmiany nazw.
+        # Najpierw Deluge i zalegĹ‚e zmiany nazw.
         if not dry_run:
             deluge = DelugeWeb(
                 cfg["deluge_url"],
@@ -1224,7 +1277,7 @@ def main():
         else:
             logging.info("DRY RUN mode enabled.")
 
-        # Dopiero później pobieranie RSS.
+        # Dopiero pĂłĹşniej pobieranie RSS.
         rss_text = fetch_rss(
             cfg["rss_url"],
             attempts=int(cfg.get("rss_retry_attempts", 3)),
@@ -1268,9 +1321,28 @@ def main():
                 if deluge is None:
                     raise RuntimeError("Deluge client is not initialized")
 
+                if not options.get("download_location"):
+                    options["download_location"] = deluge.call(
+                        "core.get_config_value", ["download_location"]
+                    )
+                # Persist Deluge's global move-on-completion destination too.
+                if "move_completed" not in options:
+                    options["move_completed"] = deluge.call(
+                        "core.get_config_value", ["move_completed"]
+                    )
+                if options.get("move_completed") and not options.get("move_completed_path"):
+                    options["move_completed_path"] = deluge.call(
+                        "core.get_config_value", ["move_completed_path"]
+                    )
+
+                def prepare(metadata):
+                    recovery.store_source(
+                        con, torrent_id, metadata,
+                        recovery.download_locations(cfg, options)
+                    )
+
                 added_torrent_id = deluge.add_torrent_url(
-                    torrent["torrent_url"],
-                    options
+                    torrent["torrent_url"], options, prepare=prepare
                 )
 
                 logging.info(
@@ -1291,15 +1363,8 @@ def main():
                         torrent["torrent_url"]
                     )
 
-                    # Zapisz jako obsłużony, aby martwy link nie blokował
-                    # każdego kolejnego uruchomienia.
-                    mark_seen(
-                        con,
-                        torrent_id,
-                        torrent["title"],
-                        torrent["torrent_url"]
-                    )
-
+                    # A failed download is not an accepted torrent.
+                    # Retry while the item remains in RSS.
                     continue
 
                 logging.warning(
@@ -1317,7 +1382,7 @@ def main():
                 )
                 continue
 
-            except RuntimeError as error:
+            except (RuntimeError, ValueError) as error:
                 message = str(error)
 
                 if "Torrent already in session" in message:
@@ -1340,6 +1405,15 @@ def main():
                 torrent["title"],
                 torrent["torrent_url"]
             )
+
+            metadata, locations = recovery.source_record(con, torrent_id)
+            if metadata and locations:
+                plan = build_filesystem_rename_plan(
+                    torrent["title"],
+                    {"save_path": locations[0], "files": metadata["files"]},
+                    get_series_rule(torrent["title"], cfg) or {}
+                )
+                save_rename_plan(con, torrent_id, plan)
 
             send_discord_webhook(
                 torrent,
@@ -1375,7 +1449,7 @@ if __name__ == "__main__":
             cfg = load_config()
             send_discord_log_webhook(
                 cfg,
-                "❌ Nyaa RSS Bot error",
+                "âťŚ Nyaa RSS Bot error",
                 f"```text\n{type(e).__name__}: {e}\n```"
             )
         except Exception:

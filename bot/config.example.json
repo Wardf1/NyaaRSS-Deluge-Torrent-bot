@@ -1,160 +1,85 @@
 {
   "rss_url": "https://nyaa.si/?page=rss",
-
   "deluge_url": "http://127.0.0.1:8112",
   "deluge_password": "CHANGE_ME",
-
-  "dry_run": false,
-
-  "default_download_location": "/downloads",
-
+  "dry_run": true,
+  "default_download_location": "/srv/media/downloads",
   "only_configured_series": true,
-
   "torrent_options": {
     "add_paused": false
   },
-
   "trusted_only": false,
   "skip_remakes": false,
   "min_seeders": 0,
-
   "include_regex": [],
   "exclude_regex": [
     "480p",
     "720p"
   ],
-
+  "recovery_metadata_per_run": 3,
   "discord_webhook": {
-    "enabled": true,
-    "url": "https://discord.com/api/webhooks/CHANGE_ME",
+    "enabled": false,
+    "url": "",
     "username": "Nyaa RSS Bot"
   },
-
   "discord_journal_webhook": {
-    "enabled": true,
-    "url": "https://discord.com/api/webhooks/CHANGE_ME",
-    "username": "Nyaa RSS Bot Logs",
-
+    "enabled": false,
+    "url": "",
+    "username": "Nyaa RSS Logs",
     "send_after_runs": 30,
     "send_empty_logs": false,
     "max_file_size_mb": 7
   },
-
   "discord_transcode_webhook": {
-    "enabled": true,
-    "url": "https://discord.com/api/webhooks/CHANGE_ME",
+    "enabled": false,
+    "url": "",
     "username": "Nyaa Transcode Worker"
   },
-
   "series": {
-
-    "Example Judas|Example English Title": {
+    "Example HEVC Series|Example HEVC Alias": {
       "include_regex": [
-        "^\\[Judas\\].*1080p.*HEVC.*Multi-Subs"
+        "\\A\\[ExampleGroup\\] Example HEVC Series - S\\d{2}E\\d{2,3} \\[1080p\\]\\[HEVC x265 10bit\\]\\[Multi-Subs\\](?:v\\d+)? \\(Weekly\\)\\Z"
       ],
-
       "trusted_only": false,
       "skip_remakes": false,
       "min_seeders": 0,
-
-      "set_name": "[Judas] Example English Title - {se}",
-
+      "set_name": "[ExampleGroup] Example HEVC Series - {se}",
       "transcode": false
     },
-
-    "Example ToonsHub|Another English Title": {
+    "Example AVC Series|Example AVC Alias": {
       "include_regex": [
-        "^\\[ToonsHub\\].*Example ToonsHub.*1080p.*CR.*WEB-DL.*AAC2\\.0.*H\\.264.*\\(Another English Title, Multi-Subs\\)$"
+        "\\A\\[ExampleGroup\\] Example AVC Series S\\d{2}E\\d{2,3} 1080p WEB-DL AAC2\\.0 H\\.264 \\(Multi-Subs\\)\\Z"
       ],
-
       "trusted_only": false,
       "skip_remakes": false,
       "min_seeders": 0,
-
-      "set_name": "[ToonsHub] Another English Title - {se}",
-
+      "set_name": "[ExampleGroup] Example AVC Series - {se}",
       "transcode": true
-    },
-
-    "Example ASW": {
-      "include_regex": [
-        "^\\[ASW\\].*1080p.*HEVC.*10Bit.*AAC"
-      ],
-
-      "trusted_only": false,
-      "skip_remakes": false,
-      "min_seeders": 0,
-
-      "default_season": 1,
-
-      "set_name": "[ASW] Example ASW Series - {se}",
-      "move_completed_path": "/downloads/Example ASW Series",
-      "transcode": false
-    },
-
-    "Example Weekly|Weekly English Title": {
-      "include_regex": [
-        "^\\[DKB\\].*Example Weekly.*1080p.*HEVC.*x265.*10bit.*Multi-Subs.*weekly"
-      ],
-
-      "trusted_only": false,
-      "skip_remakes": false,
-      "min_seeders": 0,
-
-      "set_name": "[DKB] Weekly English Title - {se}",
-
-      "transcode": false
     }
-
   },
-
   "transcode": {
-    "enabled": true,
-
+    "enabled": false,
     "queue_file": "transcode_queue.json",
-
     "ffmpeg_path": "ffmpeg",
     "ffprobe_path": "ffprobe",
-
     "output_container": "mkv",
-
-    "hardware_acceleration": "vaapi",
-    "vaapi_device": "/dev/dri/renderD128",
-
-    "encoder": "hevc_vaapi",
-    "pixel_format": "nv12",
-    "video_filter": "format=nv12,hwupload",
-
-    "rate_control": "constant_qp",
-    "qp": 24,
-
-    "profile": "main",
-    "level": null,
-
+    "hardware_acceleration": "none",
+    "encoder": "libx265",
+    "preset": "medium",
+    "crf": 22,
+    "pixel_format": "yuv420p10le",
     "audio_codec": "copy",
     "subtitle_codec": "copy",
     "attachment_codec": "copy",
-
-    "delete_source_after_success": true,
+    "delete_source_after_success": false,
     "keep_failed_output": false,
-
     "keep_completed_jobs": 100,
     "processing_stale_after": 21600,
-
     "max_duration_difference_seconds": 2.0,
-
-    "rename_stream_titles": true,
+    "rename_stream_titles": false,
     "default_stream_titles": false,
-
-    "video_title": "HEVC 10-bit",
-
-    "audio_titles": {
-      "jpn": "Japanese",
-      "eng": "English"
-    },
-
-    "subtitles_titles": {
-      "eng": "English"
-    }
+    "video_title": "",
+    "audio_titles": {},
+    "subtitles_titles": {}
   }
 }
